@@ -133,14 +133,46 @@ int main(int argc, char **argv) {
     vector<double> depth_ref;
 
     // generate pixels in ref and load depth data
-    for (int i = 0; i < nPoints; i++) {
-        int x = rng.uniform(boarder, left_img.cols - boarder);  // don't pick pixels close to boarder
-        int y = rng.uniform(boarder, left_img.rows - boarder);  // don't pick pixels close to boarder
-        int disparity = disparity_img.at<uchar>(y, x);
-        double depth = fx * baseline / disparity; // you know this is disparity to depth
-        depth_ref.push_back(depth);
-        pixels_ref.push_back(Eigen::Vector2d(x, y));
+    // for (int i = 0; i < nPoints; i++) {
+    //     int x = rng.uniform(boarder, left_img.cols - boarder);  // don't pick pixels close to boarder
+    //     int y = rng.uniform(boarder, left_img.rows - boarder);  // don't pick pixels close to boarder
+
+
+    //     int disparity = disparity_img.at<uchar>(y, x);
+    //     double depth = fx * baseline / disparity; // you know this is disparity to depth
+    //     depth_ref.push_back(depth);
+    //     pixels_ref.push_back(Eigen::Vector2d(x, y));
+    // }
+
+    for ( int x=10; x<left_img.cols-10; x++ ){
+        for ( int y=10; y<left_img.rows-10; y++ ){
+
+            Eigen::Vector2d delta (
+                left_img.ptr<uchar>(y)[x+1] - left_img.ptr<uchar>(y)[x-1], 
+                left_img.ptr<uchar>(y+1)[x] - left_img.ptr<uchar>(y-1)[x]
+            );
+            if ( delta.norm() < 100 )
+                continue;
+            int disparity = disparity_img.at<uchar>(y, x);
+            double depth = fx * baseline / disparity; // you know this is disparity to depth
+            if(depth <= 0)
+                continue;
+            depth_ref.push_back(depth);
+            pixels_ref.push_back(Eigen::Vector2d(x, y));
+
+        }
     }
+
+
+    cv::Mat left_img_for_dis = left_img.clone();
+    cv::cvtColor(left_img_for_dis, left_img_for_dis, cv::COLOR_GRAY2BGR);
+
+    for(const Eigen::Vector2d pt: pixels_ref){
+
+        cv::circle(left_img_for_dis, cv::Point2f(pt[0], pt[1]), 2, cv::Scalar(0, 250, 0), 2);
+
+    }
+    cv::imshow("left_img_for_dis", left_img_for_dis);
 
     // estimates 01~05.png's pose using this information
     Sophus::SE3d T_cur_ref;
@@ -148,8 +180,8 @@ int main(int argc, char **argv) {
     for (int i = 1; i < 6; i++) {  // 1~10
         cv::Mat img = cv::imread((fmt_others % i).str(), 0);
         // try single layer by uncomment this line
-        DirectPoseEstimationSingleLayer(left_img, img, pixels_ref, depth_ref, T_cur_ref);
-        // DirectPoseEstimationMultiLayer(left_img, img, pixels_ref, depth_ref, T_cur_ref);
+        // DirectPoseEstimationSingleLayer(left_img, img, pixels_ref, depth_ref, T_cur_ref, true);
+        DirectPoseEstimationMultiLayer(left_img, img, pixels_ref, depth_ref, T_cur_ref);
     }
     return 0;
 }
@@ -159,7 +191,9 @@ void DirectPoseEstimationSingleLayer(
     const cv::Mat &img2,
     const VecVector2d &px_ref,
     const vector<double> depth_ref,
-    Sophus::SE3d &T21) {
+    Sophus::SE3d &T21,
+    bool isDisplay
+) {
 
     const int iterations = 10;
     double cost = 0, lastCost = 0;
@@ -202,20 +236,25 @@ void DirectPoseEstimationSingleLayer(
     cout << "direct method for single layer: " << time_used.count() << endl;
 
     // plot the projected pixels here
-    cv::Mat img2_show;
-    cv::cvtColor(img2, img2_show, cv::COLOR_GRAY2BGR);
-    VecVector2d projection = jaco_accu.projected_points();
-    for (size_t i = 0; i < px_ref.size(); ++i) {
-        auto p_ref = px_ref[i];
-        auto p_cur = projection[i];
-        if (p_cur[0] > 0 && p_cur[1] > 0) {
-            cv::circle(img2_show, cv::Point2f(p_cur[0], p_cur[1]), 2, cv::Scalar(0, 250, 0), 2);
-            cv::line(img2_show, cv::Point2f(p_ref[0], p_ref[1]), cv::Point2f(p_cur[0], p_cur[1]),
-                     cv::Scalar(0, 250, 0));
+    if(isDisplay==true){
+
+        cv::Mat img2_show;
+        cv::cvtColor(img2, img2_show, cv::COLOR_GRAY2BGR);
+        VecVector2d projection = jaco_accu.projected_points();
+        for (size_t i = 0; i < px_ref.size(); ++i) {
+            auto p_ref = px_ref[i];
+            auto p_cur = projection[i];
+            if (p_cur[0] > 0 && p_cur[1] > 0) {
+                cv::circle(img2_show, cv::Point2f(p_cur[0], p_cur[1]), 2, cv::Scalar(0, 250, 0), 2);
+                // cv::line(img2_show, cv::Point2f(p_ref[0], p_ref[1]), cv::Point2f(p_cur[0], p_cur[1]),
+                //          cv::Scalar(0, 250, 0));
+            }
         }
+        cv::imshow("current", img2_show);
+        cv::waitKey();
+
     }
-    cv::imshow("current", img2_show);
-    cv::waitKey();
+    
 }
 
 void JacobianAccumulator::accumulate_jacobian(const cv::Range &range) {
@@ -333,7 +372,12 @@ void DirectPoseEstimationMultiLayer(
         fy = fyG * scales[level];
         cx = cxG * scales[level];
         cy = cyG * scales[level];
-        DirectPoseEstimationSingleLayer(pyr1[level], pyr2[level], px_ref_pyr, depth_ref, T21);
+        if(level == 0){
+            DirectPoseEstimationSingleLayer(pyr1[level], pyr2[level], px_ref_pyr, depth_ref, T21, true);
+        }
+        else{
+            DirectPoseEstimationSingleLayer(pyr1[level], pyr2[level], px_ref_pyr, depth_ref, T21, false);
+        }
     }
 
 }

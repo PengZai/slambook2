@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROJECT_NAME="slambook2"
-IMAGE_NAME="${PROJECT_NAME}:ubuntu20.04"
+IMAGE_NAME="${PROJECT_NAME}:ubuntu18.04"
 DATA_PATH="/media/${USER}/zhipeng_usb/datasets"
 DATA_PATH2="/media/${USER}/zhipeng_8t/datasets"
 # Pick up config image key if specified
@@ -17,7 +17,6 @@ docker build -t $IMAGE_NAME -f "${HOME}/vscode_projects/${PROJECT_NAME}/Docker/D
 xhost +local:root
 
 docker run \
-    --rm \
     -e DISPLAY=$DISPLAY \
     -v ~/.Xauthority:/root/.Xauthority:rw \
     --network host \

@@ -25,6 +25,9 @@ target_link_libraries(optical_flow ${OpenCV_LIBS})
 add_executable(direct_method direct_method.cpp)
 target_link_libraries(direct_method ${OpenCV_LIBS} ${Pangolin_LIBRARIES})
 
+add_executable(direct_method_for_botanic_garden direct_method_for_botanic_garden.cpp)
+target_link_libraries(direct_method_for_botanic_garden ${OpenCV_LIBS} ${Pangolin_LIBRARIES})
+
 
 add_executable(ceres_direct_method p4_Ceres_direct_method.cpp)
 target_link_libraries(ceres_direct_method ${OpenCV_LIBS} ${CERES_LIBRARIES} Sophus::Sophus)

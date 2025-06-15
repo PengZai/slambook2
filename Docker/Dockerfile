@@ -56,7 +56,9 @@ RUN	apt-get update && apt-get install -y \
 	libsuitesparse-dev \
 	libpcl-dev pcl-tools \
 	liboctomap-dev octovis \
-    libgtest-dev
+    libgtest-dev \
+	freeglut3-dev \
+	gdb
 
 
 WORKDIR /root

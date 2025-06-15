@@ -19,9 +19,15 @@ class Dataset {
 
     /// 初始化，返回是否成功
     bool Init();
+    bool Init_for_Botanic_Garden();
+
+    bool isImageFile(const std::string& filename);
+    bool readImageFromDir(const std::string dir_path, std::vector<std::string> &images_names);
+
 
     /// create and return the next frame containing the stereo images
     Frame::Ptr NextFrame();
+    Frame::Ptr NextFrameForBotanicGarden();
 
     /// get camera by id
     Camera::Ptr GetCamera(int camera_id) const {
@@ -31,6 +37,9 @@ class Dataset {
    private:
     std::string dataset_path_;
     int current_image_index_ = 0;
+
+    std::vector<std::string> left_image_names_;
+    std::vector<std::string> right_image_names_;
 
     std::vector<Camera::Ptr> cameras_;
 };

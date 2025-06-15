@@ -133,6 +133,9 @@ int Frontend::TriangulateNewPoints() {
                 map_->InsertMapPoint(new_map_point);
                 cnt_triangulated_pts++;
             }
+            else{
+                std::cout<< "wrong on triangulation : " <<  pworld[0] << "," << pworld[1] << "," << pworld[2] << std::endl;
+            }
         }
     }
     LOG(INFO) << "new landmarks: " << cnt_triangulated_pts;
@@ -292,7 +295,7 @@ int Frontend::DetectFeatures() {
     cv::Mat mask(current_frame_->left_img_.size(), CV_8UC1, 255);
     for (auto &feat : current_frame_->features_left_) {
         cv::rectangle(mask, feat->position_.pt - cv::Point2f(10, 10),
-                      feat->position_.pt + cv::Point2f(10, 10), 0, CV_FILLED);
+                      feat->position_.pt + cv::Point2f(10, 10), 0, cv::FILLED);
     }
 
     std::vector<cv::KeyPoint> keypoints;
@@ -374,6 +377,9 @@ bool Frontend::BuildInitMap() {
             current_frame_->features_right_[i]->map_point_ = new_map_point;
             cnt_init_landmarks++;
             map_->InsertMapPoint(new_map_point);
+        }
+        else{
+            std::cout<< "wrong on triangulation : " <<  pworld[0] << "," << pworld[1] << "," << pworld[2] << std::endl;
         }
     }
     current_frame_->SetKeyFrame();

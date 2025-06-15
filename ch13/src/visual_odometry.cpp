@@ -16,9 +16,17 @@ bool VisualOdometry::Init() {
         return false;
     }
 
+    std::string dataset_dir = Config::Get<std::string>("dataset_dir");
     dataset_ =
-        Dataset::Ptr(new Dataset(Config::Get<std::string>("dataset_dir")));
-    CHECK_EQ(dataset_->Init(), true);
+            Dataset::Ptr(new Dataset(dataset_dir));
+    if(dataset_dir.find("BotanicGarden") != std::string::npos){
+        CHECK_EQ(dataset_->Init_for_Botanic_Garden(), true);
+    }
+    else{
+        CHECK_EQ(dataset_->Init(), true);
+    }
+
+
 
     // create components and links
     frontend_ = Frontend::Ptr(new Frontend);
@@ -54,9 +62,18 @@ void VisualOdometry::Run() {
 }
 
 bool VisualOdometry::Step() {
-    Frame::Ptr new_frame = dataset_->NextFrame();
-    if (new_frame == nullptr) return false;
 
+    std::string dataset_dir = Config::Get<std::string>("dataset_dir");
+    Frame::Ptr new_frame;
+    if(dataset_dir.find("BotanicGarden") != std::string::npos){
+        new_frame = dataset_->NextFrameForBotanicGarden();
+
+    }
+    else{
+        new_frame = dataset_->NextFrame();
+    }
+
+    if (new_frame == nullptr) return false;
     auto t1 = std::chrono::steady_clock::now();
     bool success = frontend_->AddFrame(new_frame);
     auto t2 = std::chrono::steady_clock::now();

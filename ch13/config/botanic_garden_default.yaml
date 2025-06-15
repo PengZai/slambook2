@@ -1,0 +1,11 @@
+%YAML:1.0
+# data
+# the tum dataset directory, change it to yours! 
+# dataset_dir: /media/xiang/Data/Dataset/Kitti/dataset/sequences/00
+dataset_dir: /root/datasets2/BotanicGarden/1018-00/1018_00_img10hz600p/1018_00_img10hz600p_rectified
+
+
+
+num_features: 200
+num_features_init: 100
+num_features_tracking: 100
