@@ -37,7 +37,7 @@ class Viewer {
    private:
     void ThreadLoop();
 
-    void DrawFrame(Frame::Ptr frame, const float* color);
+    void DrawFrame(SE3 Twc, const float* color);
 
     void DrawMapPoints();
 
@@ -55,6 +55,8 @@ class Viewer {
     std::unordered_map<unsigned long, Frame::Ptr> active_keyframes_;
     std::unordered_map<unsigned long, MapPoint::Ptr> active_landmarks_;
     bool map_updated_ = false;
+    std::vector<Vec3> keyframe_trajs_;
+    std::vector<Vec3> GT_trajs_;
 
     std::mutex viewer_data_mutex_;
 };

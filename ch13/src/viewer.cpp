@@ -58,7 +58,8 @@ void Viewer::ThreadLoop() {
 
         std::unique_lock<std::mutex> lock(viewer_data_mutex_);
         if (current_frame_) {
-            DrawFrame(current_frame_, green);
+            SE3 current_frame_Twc = current_frame_->Pose().inverse();
+            DrawFrame(current_frame_Twc, green);
             FollowCurrentFrame(vis_camera);
 
             cv::Mat img = PlotFrameImage();
@@ -96,8 +97,7 @@ void Viewer::FollowCurrentFrame(pangolin::OpenGlRenderState& vis_camera) {
     vis_camera.Follow(m, true);
 }
 
-void Viewer::DrawFrame(Frame::Ptr frame, const float* color) {
-    SE3 Twc = frame->Pose().inverse();
+void Viewer::DrawFrame(SE3 Twc, const float* color) {
     const float sz = 1.0;
     const int line_width = 2.0;
     const float fx = 400;
@@ -146,9 +146,44 @@ void Viewer::DrawFrame(Frame::Ptr frame, const float* color) {
 
 void Viewer::DrawMapPoints() {
     const float red[3] = {1.0, 0, 0};
+    const float blue[3] = {0, 0, 1};
+    double newest_timestamp = 0;
+    SE3 newest_kf_Twc;
     for (auto& kf : active_keyframes_) {
-        DrawFrame(kf.second, red);
+        SE3 kf_Twc = kf.second->Pose().inverse();
+        DrawFrame(kf_Twc, red);
+        double kf_timestamp = kf.second->time_stamp_;
+        if(newest_timestamp < kf_timestamp){
+            newest_timestamp = kf_timestamp;
+            newest_kf_Twc = kf_Twc;
+        }
     }
+
+    double synchronized_GT_frame_timestamp = this->map_->dataset_->findSynchronizedPoseTimestamp(newest_timestamp, 0.05);
+    SE3 GT_Twc = this->map_->dataset_->timestamp_GT_T_map_[synchronized_GT_frame_timestamp];
+    DrawFrame(GT_Twc, blue);
+
+    this->keyframe_trajs_.push_back(newest_kf_Twc.translation());
+    this->GT_trajs_.push_back(GT_Twc.translation());
+
+    for(int i=0;i<GT_trajs_.size();i++){
+        glPointSize(5);
+        glBegin(GL_POINTS);
+        auto kf_pos = keyframe_trajs_[i];
+        glColor3f(red[0], red[1], red[2]);
+        glVertex3d(kf_pos[0], kf_pos[1], kf_pos[2]);
+        
+        glEnd();
+
+        glPointSize(5);
+        glBegin(GL_POINTS);
+        auto gt_pos = GT_trajs_[i];
+        glColor3f(blue[0], blue[1], blue[2]);
+        glVertex3d(gt_pos[0], gt_pos[1], gt_pos[2]);
+        
+        glEnd();
+    }
+
 
     glPointSize(2);
     glBegin(GL_POINTS);

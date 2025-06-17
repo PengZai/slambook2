@@ -88,7 +88,7 @@ bool Frontend::InsertKeyframe() {
     // triangulate map points
     TriangulateNewPoints();
     // update backend because we have a new keyframe
-    backend_->UpdateMap();
+    // backend_->UpdateMap();
 
     if (viewer_) viewer_->UpdateMap();
 
@@ -166,6 +166,8 @@ int Frontend::EstimateCurrentPose() {
     int index = 1;
     std::vector<EdgeProjectionPoseOnly *> edges;
     std::vector<Feature::Ptr> features;
+
+    int feature_size = current_frame_->features_left_.size();
     for (size_t i = 0; i < current_frame_->features_left_.size(); ++i) {
         auto mp = current_frame_->features_left_[i]->map_point_.lock();
         if (mp) {
@@ -384,7 +386,7 @@ bool Frontend::BuildInitMap() {
     }
     current_frame_->SetKeyFrame();
     map_->InsertKeyFrame(current_frame_);
-    backend_->UpdateMap();
+    // backend_->UpdateMap();
 
     LOG(INFO) << "Initial map created with " << cnt_init_landmarks
               << " map points";

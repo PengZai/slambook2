@@ -20,7 +20,8 @@ class Dataset {
     /// 初始化，返回是否成功
     bool Init();
     bool Init_for_Botanic_Garden();
-
+    void load_groundtruth(const std::string &path_to_file, std::map<double, Sophus::SE3d> &timestamp_GT_T_map);
+    double findSynchronizedPoseTimestamp(const double base_timestamp, const double max_tolerant_time_offset) const;
     bool isImageFile(const std::string& filename);
     bool readImageFromDir(const std::string dir_path, std::vector<std::string> &images_names);
 
@@ -33,6 +34,9 @@ class Dataset {
     Camera::Ptr GetCamera(int camera_id) const {
         return cameras_.at(camera_id);
     }
+
+    std::map<double, Sophus::SE3d> timestamp_GT_T_map_;
+    std::map<double, Sophus::SE3d> timestamp_GT_T_full_map_;
 
    private:
     std::string dataset_path_;

@@ -5,6 +5,8 @@
 #include "myslam/common_include.h"
 #include "myslam/frame.h"
 #include "myslam/mappoint.h"
+#include "myslam/dataset.h"
+
 
 namespace myslam {
 
@@ -52,6 +54,9 @@ class Map {
     /// 清理map中观测数量为零的点
     void CleanMap();
 
+    Dataset::Ptr dataset_ = nullptr;
+
+
    private:
     // 将旧的关键帧置为不活跃状态
     void RemoveOldKeyframe();
@@ -61,6 +66,8 @@ class Map {
     LandmarksType active_landmarks_;  // active landmarks
     KeyframesType keyframes_;         // all key-frames
     KeyframesType active_keyframes_;  // all key-frames
+    KeyframesType GT_frames_;  // all key-frames
+
 
     Frame::Ptr current_frame_ = nullptr;
 
