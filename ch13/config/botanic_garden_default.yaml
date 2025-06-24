@@ -6,6 +6,6 @@ dataset_dir: /root/datasets2/BotanicGarden/1018-00/1018_00_img10hz600p/1018_00_i
 
 
 
-num_features: 200
-num_features_init: 100
-num_features_tracking: 100
+num_features: 150
+num_features_init: 50
+num_features_tracking: 50

@@ -38,7 +38,7 @@ inline bool triangulation(const std::vector<SE3> &poses,
     // }
 
     // return false;
-    std::cout << "condition number : " << svd.singularValues()[0] / svd.singularValues()[3] << std::endl;
+    // std::cout << "condition number : " << svd.singularValues()[0] / svd.singularValues()[3] << std::endl;
 
     if (svd.singularValues()[3] / svd.singularValues()[2] < 1e-2) {
         // solution qualtiy is not good, give up

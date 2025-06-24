@@ -263,11 +263,11 @@ Frame::Ptr Dataset::NextFrameForBotanicGarden(){
     auto new_frame = Frame::CreateFrame();
     new_frame->left_img_ = image_left;
     new_frame->right_img_ = image_right;
-    current_image_index_++;
 
     uint64_t nanoseconds = std::stoull(left_image_names_[current_image_index_]);  // Use std::stoll if negative possible
     new_frame->time_stamp_ = static_cast<double>(nanoseconds) / 1e9;
 
+    current_image_index_++;
 
     return new_frame;
 

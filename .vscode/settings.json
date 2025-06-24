@@ -71,6 +71,8 @@
         "valarray": "cpp",
         "csignal": "cpp",
         "unordered_set": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "core": "cpp",
+        "numericaldiff": "cpp"
     }
 }

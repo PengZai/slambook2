@@ -5,7 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "ch7_pose_estimation_3d2d",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/ch7/build/pose_estimation_3d2d",
+            "args": ["${workspaceFolder}/ch7/1.png", "${workspaceFolder}/ch7/2.png", "${workspaceFolder}/ch7/1_depth.png", "${workspaceFolder}/ch7/2_depth.png"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb"
+            
+        },
+        
+        {
+            "name": "ch13_run_kitti_stereo",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/ch13/bin/run_kitti_stereo",

@@ -45,6 +45,8 @@ bool Frontend::AddFrame(myslam::Frame::Ptr frame) {
 bool Frontend::Track() {
     if (last_frame_) {
         current_frame_->SetPose(relative_motion_ * last_frame_->Pose());
+        // current_frame_->SetPose(last_frame_->Pose());
+
     }
 
     int num_track_last = TrackLastFrame();
@@ -134,13 +136,54 @@ int Frontend::TriangulateNewPoints() {
                 cnt_triangulated_pts++;
             }
             else{
-                std::cout<< "wrong on triangulation : " <<  pworld[0] << "," << pworld[1] << "," << pworld[2] << std::endl;
+                // std::cout<< "wrong on triangulation : " <<  pworld[0] << "," << pworld[1] << "," << pworld[2] << std::endl;
             }
         }
     }
     LOG(INFO) << "new landmarks: " << cnt_triangulated_pts;
     return cnt_triangulated_pts;
 }
+
+
+bool Frontend::BuildInitMap() {
+    std::vector<SE3> poses{camera_left_->pose(), camera_right_->pose()};
+    size_t cnt_init_landmarks = 0;
+    for (size_t i = 0; i < current_frame_->features_left_.size(); ++i) {
+        if (current_frame_->features_right_[i] == nullptr) continue;
+        // create map point from triangulation
+        std::vector<Vec3> points{
+            camera_left_->pixel2camera(
+                Vec2(current_frame_->features_left_[i]->position_.pt.x,
+                     current_frame_->features_left_[i]->position_.pt.y)),
+            camera_right_->pixel2camera(
+                Vec2(current_frame_->features_right_[i]->position_.pt.x,
+                     current_frame_->features_right_[i]->position_.pt.y))};
+        Vec3 pworld = Vec3::Zero();
+
+        if (triangulation(poses, points, pworld) && pworld[2] > 0) {
+            auto new_map_point = MapPoint::CreateNewMappoint();
+            new_map_point->SetPos(pworld);
+            new_map_point->AddObservation(current_frame_->features_left_[i]);
+            new_map_point->AddObservation(current_frame_->features_right_[i]);
+            current_frame_->features_left_[i]->map_point_ = new_map_point;
+            current_frame_->features_right_[i]->map_point_ = new_map_point;
+            cnt_init_landmarks++;
+            map_->InsertMapPoint(new_map_point);
+        }
+        else{
+            // std::cout<< "wrong on triangulation : " <<  pworld[0] << "," << pworld[1] << "," << pworld[2] << std::endl;
+        }
+    }
+    current_frame_->SetKeyFrame();
+    map_->InsertKeyFrame(current_frame_);
+    // backend_->UpdateMap();
+
+    LOG(INFO) << "Initial map created with " << cnt_init_landmarks
+              << " map points";
+
+    return true;
+}
+
 
 int Frontend::EstimateCurrentPose() {
     // setup g2o
@@ -189,31 +232,32 @@ int Frontend::EstimateCurrentPose() {
     // estimate the Pose the determine the outliers
     const double chi2_th = 5.991;
     int cnt_outlier = 0;
-    for (int iteration = 0; iteration < 4; ++iteration) {
+    // for (int iteration = 0; iteration < 4; ++iteration) {
+    for (int iteration = 0; iteration < 1; ++iteration) {
         vertex_pose->setEstimate(current_frame_->Pose());
         optimizer.initializeOptimization();
         optimizer.optimize(10);
         cnt_outlier = 0;
 
         // count the outliers
-        for (size_t i = 0; i < edges.size(); ++i) {
-            auto e = edges[i];
-            if (features[i]->is_outlier_) {
-                e->computeError();
-            }
-            if (e->chi2() > chi2_th) {
-                features[i]->is_outlier_ = true;
-                e->setLevel(1);
-                cnt_outlier++;
-            } else {
-                features[i]->is_outlier_ = false;
-                e->setLevel(0);
-            };
+        // for (size_t i = 0; i < edges.size(); ++i) {
+        //     auto e = edges[i];
+        //     if (features[i]->is_outlier_) {
+        //         e->computeError();
+        //     }
+        //     if (e->chi2() > chi2_th) {
+        //         features[i]->is_outlier_ = true;
+        //         e->setLevel(1);
+        //         cnt_outlier++;
+        //     } else {
+        //         features[i]->is_outlier_ = false;
+        //         e->setLevel(0);
+        //     };
 
-            if (iteration == 2) {
-                e->setRobustKernel(nullptr);
-            }
-        }
+        //     if (iteration == 2) {
+        //         e->setRobustKernel(nullptr);
+        //     }
+        // }
     }
 
     LOG(INFO) << "Outlier/Inlier in pose estimating: " << cnt_outlier << "/"
@@ -355,44 +399,6 @@ int Frontend::FindFeaturesInRight() {
     return num_good_pts;
 }
 
-bool Frontend::BuildInitMap() {
-    std::vector<SE3> poses{camera_left_->pose(), camera_right_->pose()};
-    size_t cnt_init_landmarks = 0;
-    for (size_t i = 0; i < current_frame_->features_left_.size(); ++i) {
-        if (current_frame_->features_right_[i] == nullptr) continue;
-        // create map point from triangulation
-        std::vector<Vec3> points{
-            camera_left_->pixel2camera(
-                Vec2(current_frame_->features_left_[i]->position_.pt.x,
-                     current_frame_->features_left_[i]->position_.pt.y)),
-            camera_right_->pixel2camera(
-                Vec2(current_frame_->features_right_[i]->position_.pt.x,
-                     current_frame_->features_right_[i]->position_.pt.y))};
-        Vec3 pworld = Vec3::Zero();
-
-        if (triangulation(poses, points, pworld) && pworld[2] > 0) {
-            auto new_map_point = MapPoint::CreateNewMappoint();
-            new_map_point->SetPos(pworld);
-            new_map_point->AddObservation(current_frame_->features_left_[i]);
-            new_map_point->AddObservation(current_frame_->features_right_[i]);
-            current_frame_->features_left_[i]->map_point_ = new_map_point;
-            current_frame_->features_right_[i]->map_point_ = new_map_point;
-            cnt_init_landmarks++;
-            map_->InsertMapPoint(new_map_point);
-        }
-        else{
-            std::cout<< "wrong on triangulation : " <<  pworld[0] << "," << pworld[1] << "," << pworld[2] << std::endl;
-        }
-    }
-    current_frame_->SetKeyFrame();
-    map_->InsertKeyFrame(current_frame_);
-    // backend_->UpdateMap();
-
-    LOG(INFO) << "Initial map created with " << cnt_init_landmarks
-              << " map points";
-
-    return true;
-}
 
 bool Frontend::Reset() {
     LOG(INFO) << "Reset is not implemented. ";

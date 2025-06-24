@@ -40,6 +40,8 @@ class Viewer {
     void DrawFrame(SE3 Twc, const float* color);
 
     void DrawMapPoints();
+    void drawLine(const Eigen::Vector3d &p1, const Eigen::Vector3d &p2, const Eigen::Vector3i &bgr, const int line_size);
+    void drawPoint(const Eigen::Vector3d &pt3d, const Eigen::Vector3i &bgr, const int point_size);
 
     void FollowCurrentFrame(pangolin::OpenGlRenderState& vis_camera);
 

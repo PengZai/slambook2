@@ -144,6 +144,28 @@ void Viewer::DrawFrame(SE3 Twc, const float* color) {
     glPopMatrix();
 }
 
+
+void Viewer::drawLine(const Eigen::Vector3d &p1, const Eigen::Vector3d &p2, const Eigen::Vector3i &rgb, const int line_size){
+
+    glLineWidth(line_size);
+    glColor3d(rgb[0],rgb[1],rgb[2]);
+    glBegin(GL_LINES);
+    glVertex3d(p1.x(),p1.y(),p1.z());
+    glVertex3d(p2.x(),p2.y(),p2.z());
+    glEnd();
+}
+
+void Viewer::drawPoint(const Eigen::Vector3d &pt3d, const Eigen::Vector3i &rgb, const int point_size){
+
+    glPointSize(point_size);
+    glBegin(GL_POINTS);
+    glVertex3d(pt3d[0],pt3d[1],pt3d[2]);
+    glColor3d(rgb[0],rgb[1],rgb[2]);
+    glEnd();
+
+}
+
+
 void Viewer::DrawMapPoints() {
     const float red[3] = {1.0, 0, 0};
     const float blue[3] = {0, 0, 1};
@@ -166,22 +188,24 @@ void Viewer::DrawMapPoints() {
     this->keyframe_trajs_.push_back(newest_kf_Twc.translation());
     this->GT_trajs_.push_back(GT_Twc.translation());
 
-    for(int i=0;i<GT_trajs_.size();i++){
-        glPointSize(5);
-        glBegin(GL_POINTS);
-        auto kf_pos = keyframe_trajs_[i];
-        glColor3f(red[0], red[1], red[2]);
-        glVertex3d(kf_pos[0], kf_pos[1], kf_pos[2]);
-        
-        glEnd();
 
-        glPointSize(5);
-        glBegin(GL_POINTS);
+    Vec3 last_kf_pos, last_gt_pos;
+    for(int i=0;i<GT_trajs_.size();i++){
+
+
+        auto kf_pos = keyframe_trajs_[i];
+        drawPoint(kf_pos, Eigen::Vector3i(red[0], red[1], red[2]), 5);
+
         auto gt_pos = GT_trajs_[i];
-        glColor3f(blue[0], blue[1], blue[2]);
-        glVertex3d(gt_pos[0], gt_pos[1], gt_pos[2]);
-        
-        glEnd();
+        drawPoint(gt_pos, Eigen::Vector3i(blue[0], blue[1], blue[2]), 5);
+
+        if(i>=1){
+            drawLine(last_kf_pos, kf_pos, Eigen::Vector3i(red[0], red[1], red[2]), 2);
+            drawLine(last_gt_pos, gt_pos, Eigen::Vector3i(blue[0], blue[1], blue[2]), 2);
+        }
+
+        last_kf_pos = kf_pos;
+        last_gt_pos = gt_pos;
     }
 
 
