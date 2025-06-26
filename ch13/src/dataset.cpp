@@ -143,8 +143,11 @@ double Dataset::findSynchronizedPoseTimestamp(const double base_timestamp, const
 bool Dataset::Init_for_Botanic_Garden() {
 
 
-    std::string left_image_dir = dataset_path_ + "/left_rgb_rectified";
-    std::string right_image_dir = dataset_path_ + "/right_rgb_rectified";
+    // std::string left_image_dir = dataset_path_ + "/left_rgb_rectified";
+    // std::string right_image_dir = dataset_path_ + "/right_rgb_rectified";
+
+    std::string left_image_dir = dataset_path_ + "/left_rgb";
+    std::string right_image_dir = dataset_path_ + "/right_rgb";
 
     std::string GT_path = dataset_path_ + "/1018_00_GT_output.txt";
 
@@ -185,21 +188,38 @@ bool Dataset::Init_for_Botanic_Garden() {
     }
     
 
-    Mat33 K;
-    K << 654.78839288, 0.0, 462.13834,
-         0.0, 654.78839288, 306.05381012,
-         0.0, 0.0, 1.0;
+    Mat33 K1;
+    // K << 654.78839288, 0.0, 462.13834,
+    //      0.0, 654.78839288, 306.05381012,
+    //      0.0, 0.0, 1.0;
+    
+    K1 << 642.9165664800531, 0.0, 460.1840658156501,
+        0.0, 641.9171825800378, 308.5846449100310,
+        0.0, 0.0, 1.0;
     
     Vec3 t1;
     t1 << 0, 0, 0;
-    Camera::Ptr new_camera1(new Camera(K(0, 0), K(1, 1), K(0, 2), K(1, 2),
+    Camera::Ptr new_camera1(new Camera(K1(0, 0), K1(1, 1), K1(0, 2), K1(1, 2),
                                           t1.norm(), SE3(SO3(), t1)));
 
     // there are some wrong on triangulation equation, so in there, we give a negative x for translation.
     Vec3 t2;
+    Mat33 K2;
+    
+    K2 << 644.4385505412966, 0.0, 455.1775919513420,
+        0.0, 643.5879520187435, 304.1616226347153,
+        0.0, 0.0, 1.0;
+
+    Mat44 T21;
+    T21 << 0.99999469864231316, 0.0032486921518710653, 0.00022623438371112111, -0.2537699035697123,
+            -0.0032504006316628311, 0.99996260003629511, 0.0080152223032195422, 0.0012855272193861237,
+            -0.00020019613600427515, -0.0080159097574153942, 0.99996785708489311, 0.00033140845236917515,
+            0, 0, 0, 1;
+    SE3 SE_T21 = SE3::fitToSE3(T21);
+
     t2 << -0.253736175410149, 0, 0;
-    Camera::Ptr new_camera2(new Camera(K(0, 0), K(1, 1), K(0, 2), K(1, 2),
-                                          t2.norm(), SE3(SO3(), t2)));
+    Camera::Ptr new_camera2(new Camera(K2(0, 0), K2(1, 1), K2(0, 2), K2(1, 2),
+                                          SE_T21.translation().norm(), SE_T21));
 
 
     cameras_.push_back(new_camera1);
@@ -247,11 +267,18 @@ Frame::Ptr Dataset::NextFrameForBotanicGarden(){
 
     cv::Mat image_left, image_right;
     // read images
+    // image_left =
+    //     cv::imread(dataset_path_ + "/left_rgb_rectified/" + left_image_names_[current_image_index_],
+    //                cv::IMREAD_GRAYSCALE);
+    // image_right =
+    //     cv::imread(dataset_path_ + "/right_rgb_rectified/" + right_image_names_[current_image_index_],
+    //                cv::IMREAD_GRAYSCALE);
+
     image_left =
-        cv::imread(dataset_path_ + "/left_rgb_rectified/" + left_image_names_[current_image_index_],
+        cv::imread(dataset_path_ + "/left_rgb/" + left_image_names_[current_image_index_],
                    cv::IMREAD_GRAYSCALE);
     image_right =
-        cv::imread(dataset_path_ + "/right_rgb_rectified/" + right_image_names_[current_image_index_],
+        cv::imread(dataset_path_ + "/right_rgb/" + right_image_names_[current_image_index_],
                    cv::IMREAD_GRAYSCALE);
 
     if (image_left.data == nullptr || image_right.data == nullptr) {

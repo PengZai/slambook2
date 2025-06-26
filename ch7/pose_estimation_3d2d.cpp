@@ -126,6 +126,36 @@ int main(int argc, char **argv) {
   cout << "R=" << endl << R << endl;
   cout << "t=" << endl << t << endl;
 
+
+  t1 = chrono::steady_clock::now();
+  Mat r2, tt2;
+  cv::Mat inliers;
+  bool success = solvePnPRansac(pts_3d, pts_2d, K, Mat(), r2, tt2, false, 100, 4.0, 0.99, inliers); // 调用OpenCV 的 PnP 求解，可选择EPNP，DLS等方法
+  Mat R2;
+  cv::Rodrigues(r2, R2); // r为旋转向量形式，用Rodrigues公式转换为矩阵
+  t2 = chrono::steady_clock::now();
+  time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+  cout << "solve solvePnPRansac in opencv cost time: " << time_used.count() << " seconds." << endl;
+
+  cout << "R=" << endl << R2 << endl;
+  cout << "t=" << endl << tt2 << endl;
+
+  t1 = chrono::steady_clock::now();
+  Mat r3, tt3;
+
+  std::vector<cv::Point2f> undistorted_points;
+  cv::undistortPoints(pts_2d, undistorted_points, K, Mat());
+  cv::Mat inliers3;
+  bool success3 = solvePnPRansac(pts_3d, undistorted_points, Mat::eye(3,3,CV_64F), Mat(), r3, tt3, false, 100, 4.0, 0.99, inliers3); // 调用OpenCV 的 PnP 求解，可选择EPNP，DLS等方法
+  Mat R3;
+  cv::Rodrigues(r3, R3); // r为旋转向量形式，用Rodrigues公式转换为矩阵
+  t2 = chrono::steady_clock::now();
+  time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+  cout << "solve solvePnPRansac in normalized plane in opencv cost time: " << time_used.count() << " seconds." << endl;
+
+  cout << "R=" << endl << R3 << endl;
+  cout << "t=" << endl << tt3 << endl;
+
   VecVector3d pts_3d_eigen;
   VecVector2d pts_2d_eigen;
   std::vector<Eigen::Vector3d> my_pts_3d_eigen;

@@ -12,6 +12,7 @@
 #include "myslam/g2o_types.h"
 #include "myslam/map.h"
 #include "myslam/viewer.h"
+#include "myslam/bundle_adjustment.h"
 
 namespace myslam {
 
@@ -50,7 +51,9 @@ bool Frontend::Track() {
     }
 
     int num_track_last = TrackLastFrame();
+    // tracking_inliers_ = EstimateCurrentPoseWithCeres();
     tracking_inliers_ = EstimateCurrentPose();
+
 
     if (tracking_inliers_ > num_features_tracking_) {
         // tracking good
@@ -184,6 +187,91 @@ bool Frontend::BuildInitMap() {
     return true;
 }
 
+
+bool bundleAdjustmentPoseOnlyCeres(
+  std::vector<Eigen::Vector3d> &points_3d,
+  std::vector<Eigen::Vector2d> &points_2d,
+  const Eigen::Matrix<double, 3, 3> &K,
+  SE3 &pose
+) {
+  
+  Eigen::Matrix<double, 1, 6> se3_vec = pose.log().transpose();
+
+  ceres::Problem problem;
+  ceres::LossFunction* loss_function =
+                new ceres::HuberLoss(1.0);
+  
+  for(int idx=0;idx<points_2d.size();idx++){
+
+
+    ceres::CostFunction *cost_function = new reprojectionCostFunctionForPoseOnly(points_3d[idx], points_2d[idx], K);
+    problem.AddResidualBlock(cost_function, loss_function, se3_vec.data());
+  }
+  
+  
+
+  // Run the solver!
+  ceres::Solver::Options options;
+  options.linear_solver_type = ceres::LinearSolverType::SPARSE_SCHUR;
+  options.minimizer_progress_to_stdout = true;
+  options.max_num_iterations = 50;
+  // options.gradient_tolerance = 1e-10;
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+  std::cout << summary.FullReport() << "\n";
+
+
+  pose = SE3::exp(se3_vec);
+  std::cout << "only pose estimation: \n" << pose.matrix() << std::endl;
+
+  return true;
+
+}
+
+int Frontend::EstimateCurrentPoseWithCeres() {
+    
+    SE3 curr_frame_pose = current_frame_->Pose();
+    std::vector<Eigen::Vector3d> points_3d;
+    std::vector<Eigen::Vector2d> points_2d;
+    Eigen::Matrix<double, 3, 3> K = camera_left_->K();
+    std::vector<Feature::Ptr> features;
+
+
+    int feature_size = current_frame_->features_left_.size();
+    for (size_t i = 0; i < current_frame_->features_left_.size(); ++i) {
+
+
+        auto mp = current_frame_->features_left_[i]->map_point_.lock();
+
+        if (mp) {
+            cv::Point2f pt2f = current_frame_->features_left_[i]->position_.pt;
+            features.push_back(current_frame_->features_left_[i]);
+            Eigen::Vector3d point_3d = mp->pos_;
+            points_3d.push_back(point_3d);
+            points_2d.push_back(Eigen::Vector2d(pt2f.x, pt2f.y));
+        }
+    }
+
+    bool success = bundleAdjustmentPoseOnlyCeres(points_3d, points_2d, K, curr_frame_pose);
+
+    int cnt_outlier = 0;
+
+    LOG(INFO) << "Outlier/Inlier in pose estimating: " << cnt_outlier << "/"
+            << features.size() - cnt_outlier;
+    // Set pose and outlier
+    current_frame_->SetPose(curr_frame_pose);
+
+    LOG(INFO) << "Current Pose = \n" << current_frame_->Pose().matrix();
+
+    for (auto &feat : features) {
+        if (feat->is_outlier_) {
+            feat->map_point_.reset();
+            feat->is_outlier_ = false;  // maybe we can still use it in future
+        }
+    }
+    return features.size() - cnt_outlier;
+
+}
 
 int Frontend::EstimateCurrentPose() {
     // setup g2o

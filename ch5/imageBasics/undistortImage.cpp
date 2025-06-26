@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   // 内参
   double fx = 458.654, fy = 457.296, cx = 367.215, cy = 248.375;
 
-  cv::Mat image = cv::imread(image_file, 0);   // 图像是灰度图，CV_8UC1
+  cv::Mat image = cv::imread(argv[1], 0);   // 图像是灰度图，CV_8UC1
   int rows = image.rows, cols = image.cols;
   cv::Mat image_undistort = cv::Mat(rows, cols, CV_8UC1);   // 去畸变以后的图
 
