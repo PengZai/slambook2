@@ -266,6 +266,7 @@ Frame::Ptr Dataset::NextFrameForBotanicGarden(){
 
 
     cv::Mat image_left, image_right;
+    cv::Mat image_left_gray, image_right_gray;
     // read images
     // image_left =
     //     cv::imread(dataset_path_ + "/left_rgb_rectified/" + left_image_names_[current_image_index_],
@@ -276,20 +277,25 @@ Frame::Ptr Dataset::NextFrameForBotanicGarden(){
 
     image_left =
         cv::imread(dataset_path_ + "/left_rgb/" + left_image_names_[current_image_index_],
-                   cv::IMREAD_GRAYSCALE);
+                   cv::COLOR_BGR2GRAY);
     image_right =
         cv::imread(dataset_path_ + "/right_rgb/" + right_image_names_[current_image_index_],
-                   cv::IMREAD_GRAYSCALE);
+                   cv::COLOR_BGR2GRAY);
 
     if (image_left.data == nullptr || image_right.data == nullptr) {
         LOG(WARNING) << "cannot find images at index " << current_image_index_;
         return nullptr;
     }
 
+    cv::cvtColor(image_left, image_left_gray, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(image_right, image_right_gray, cv::COLOR_BGR2GRAY);
+
 
     auto new_frame = Frame::CreateFrame();
-    new_frame->left_img_ = image_left;
-    new_frame->right_img_ = image_right;
+    new_frame->left_color_img_ = image_left;
+    new_frame->right_color_img_ = image_right;
+    new_frame->left_img_ = image_left_gray;
+    new_frame->right_img_ = image_right_gray;
 
     uint64_t nanoseconds = std::stoull(left_image_names_[current_image_index_]);  // Use std::stoll if negative possible
     new_frame->time_stamp_ = static_cast<double>(nanoseconds) / 1e9;

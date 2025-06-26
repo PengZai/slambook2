@@ -27,6 +27,7 @@ struct Frame {
     double time_stamp_;              // 时间戳，暂不使用
     SE3 pose_;                       // Tcw 形式Pose
     std::mutex pose_mutex_;          // Pose数据锁
+    cv::Mat left_color_img_, right_color_img_;   // stereo images
     cv::Mat left_img_, right_img_;   // stereo images
 
     // extracted features in left image

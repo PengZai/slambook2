@@ -51,8 +51,8 @@ bool Frontend::Track() {
     }
 
     int num_track_last = TrackLastFrame();
-    // tracking_inliers_ = EstimateCurrentPoseWithCeres();
-    tracking_inliers_ = EstimateCurrentPose();
+    tracking_inliers_ = EstimateCurrentPoseWithCeres();
+    // tracking_inliers_ = EstimateCurrentPose();
 
 
     if (tracking_inliers_ > num_features_tracking_) {
@@ -204,7 +204,47 @@ bool bundleAdjustmentPoseOnlyCeres(
   for(int idx=0;idx<points_2d.size();idx++){
 
 
-    ceres::CostFunction *cost_function = new reprojectionCostFunctionForPoseOnly(points_3d[idx], points_2d[idx], K);
+    ceres::CostFunction *cost_function = new reprojectionCostFunctionForPoseOnlyWithK(points_3d[idx], points_2d[idx], K);
+    problem.AddResidualBlock(cost_function, loss_function, se3_vec.data());
+  }
+  
+  
+
+  // Run the solver!
+  ceres::Solver::Options options;
+  options.linear_solver_type = ceres::LinearSolverType::SPARSE_SCHUR;
+  options.minimizer_progress_to_stdout = true;
+  options.max_num_iterations = 50;
+  // options.gradient_tolerance = 1e-10;
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+  std::cout << summary.FullReport() << "\n";
+
+
+  pose = SE3::exp(se3_vec);
+  std::cout << "only pose estimation: \n" << pose.matrix() << std::endl;
+
+  return true;
+
+}
+
+
+bool bundleAdjustmentPoseOnlyCeres(
+  std::vector<Eigen::Vector3d> &points_3d,
+  std::vector<Eigen::Vector2d> &points_2d,
+  SE3 &pose
+) {
+  
+  Eigen::Matrix<double, 1, 6> se3_vec = pose.log().transpose();
+
+  ceres::Problem problem;
+  ceres::LossFunction* loss_function =
+                new ceres::HuberLoss(1.0);
+  
+  for(int idx=0;idx<points_2d.size();idx++){
+
+
+    ceres::CostFunction *cost_function = new reprojectionCostFunctionForPoseOnly(points_3d[idx], points_2d[idx]);
     problem.AddResidualBlock(cost_function, loss_function, se3_vec.data());
   }
   
@@ -232,8 +272,10 @@ int Frontend::EstimateCurrentPoseWithCeres() {
     
     SE3 curr_frame_pose = current_frame_->Pose();
     std::vector<Eigen::Vector3d> points_3d;
-    std::vector<Eigen::Vector2d> points_2d;
+    std::vector<Eigen::Vector2d> points_2d, eigen_points_2d_normalized;
     Eigen::Matrix<double, 3, 3> K = camera_left_->K();
+    Mat cv_K;
+    eigen2cv(K, cv_K);
     std::vector<Feature::Ptr> features;
 
 
@@ -248,11 +290,19 @@ int Frontend::EstimateCurrentPoseWithCeres() {
             features.push_back(current_frame_->features_left_[i]);
             Eigen::Vector3d point_3d = mp->pos_;
             points_3d.push_back(point_3d);
+            std::vector<cv::Point2f> cv_points_2d, points_2d_normalized;
+            cv_points_2d.push_back(pt2f);
             points_2d.push_back(Eigen::Vector2d(pt2f.x, pt2f.y));
+            cv::undistortPoints(cv_points_2d, points_2d_normalized, cv_K, Mat());
+
+            eigen_points_2d_normalized.push_back(Eigen::Vector2d(points_2d_normalized[0].x, points_2d_normalized[0].y));
         }
     }
 
+
     bool success = bundleAdjustmentPoseOnlyCeres(points_3d, points_2d, K, curr_frame_pose);
+    // bool success = bundleAdjustmentPoseOnlyCeres(points_3d, eigen_points_2d_normalized, curr_frame_pose);
+
 
     int cnt_outlier = 0;
 
@@ -472,6 +522,8 @@ int Frontend::FindFeaturesInRight() {
         cv::OPTFLOW_USE_INITIAL_FLOW);
 
     int num_good_pts = 0;
+    std::vector<size_t> lost_track_ids;
+
     for (size_t i = 0; i < status.size(); ++i) {
         if (status[i]) {
             cv::KeyPoint kp(kps_right[i], 7);
@@ -480,7 +532,9 @@ int Frontend::FindFeaturesInRight() {
             current_frame_->features_right_.push_back(feat);
             num_good_pts++;
         } else {
+            lost_track_ids.push_back(i);
             current_frame_->features_right_.push_back(nullptr);
+
         }
     }
     LOG(INFO) << "Find " << num_good_pts << " in the right image.";
