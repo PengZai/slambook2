@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
   // 画图去畸变后图像
   cv::imshow("distorted", image);
   cv::imshow("undistorted", image_undistort);
+  cv::imwrite("undistorted.png", image_undistort);
   cv::waitKey();
   return 0;
 }

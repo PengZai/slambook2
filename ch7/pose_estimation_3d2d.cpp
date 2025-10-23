@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Eigen/Core>
 #include <opencv2/core/core.hpp>
-#include <opencv2/core/eigen.hpp>  // 🔴 Needed to use cv::cv2eigen()
+#include <opencv2/core/eigen.hpp>  // Needed to use cv::cv2eigen()
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -57,6 +57,22 @@ void bundleAdjustmentPoseOnlyCeres(
   std::vector<Eigen::Vector2d> &points_2d,
   const Eigen::Matrix<double, 3, 3> &K,
   Sophus::SE3d &pose
+);
+
+void bundleAdjustmentBasePoseOnlyCeres(
+  std::vector<Eigen::Vector3d> &points_3d,
+  std::vector<Eigen::Vector2d> &points_2d,
+  const Eigen::Matrix<double, 3, 3> &K,
+  Sophus::SE3d &Tbw,
+  Sophus::SE3d &Tcb
+);
+
+void bundleAdjustmentBasePoseOnlyCeresAutoDiff(
+  std::vector<Eigen::Vector3d> &points_3d,
+  std::vector<Eigen::Vector2d> &points_2d,
+  const Eigen::Matrix<double, 3, 3> &K,
+  Sophus::SE3d &Tbw,
+  Sophus::SE3d &Tcb
 );
 
 void bundleAdjustmentPoseOnlyCeresAutoDiff(
@@ -158,14 +174,25 @@ int main(int argc, char **argv) {
 
   VecVector3d pts_3d_eigen;
   VecVector2d pts_2d_eigen;
-  std::vector<Eigen::Vector3d> my_pts_3d_eigen;
+  std::vector<Eigen::Vector3d> my_pts_3d_eigen, my_pts_3d_eigen_in_base_coordinate;
   std::vector<Eigen::Vector2d> my_pts_2d_eigen;
 
+  Eigen::Matrix4d T_base_cam0;
+  T_base_cam0 << -0.00140533,-0.00896721,0.99995881,0.18377395,
+                -0.99999022,0.0042065,-0.00136765,0.14789743,
+                -0.00419407,-0.99995095,-0.00897304,-0.0087318,
+                0, 0, 0, 1.0;
+  Sophus::SE3d Tbc = Sophus::SE3d::fitToSE3(T_base_cam0);
+  Sophus::SE3d Tcb = Tbc.inverse();
   for (size_t i = 0; i < pts_3d.size(); ++i) {
-    pts_3d_eigen.push_back(Eigen::Vector3d(pts_3d[i].x, pts_3d[i].y, pts_3d[i].z));
+
+    Eigen::Vector3d pt3d_in_cam_coordinate = Eigen::Vector3d(pts_3d[i].x, pts_3d[i].y, pts_3d[i].z);
+    Eigen::Vector3d pt3d_in_base_coordinate = Tbc.matrix().block<3,4>(0,0) * pt3d_in_cam_coordinate.homogeneous();
+    pts_3d_eigen.push_back(pt3d_in_cam_coordinate);
     pts_2d_eigen.push_back(Eigen::Vector2d(pts_2d[i].x, pts_2d[i].y));
-    my_pts_3d_eigen.push_back(Eigen::Vector3d(pts_3d[i].x, pts_3d[i].y, pts_3d[i].z));
+    my_pts_3d_eigen.push_back(pt3d_in_cam_coordinate);
     my_pts_2d_eigen.push_back(Eigen::Vector2d(pts_2d[i].x, pts_2d[i].y));
+    my_pts_3d_eigen_in_base_coordinate.push_back(pt3d_in_base_coordinate);
     // std::cout << "pts_3d_eigen:" << pts_3d_eigen[i].x() << " , " <<  pts_3d_eigen[i].y() << " , " << pts_3d_eigen[i].z() << "| "
     // << "my_pts_3d_eigen:" << my_pts_3d_eigen[i].x() << " , " <<  my_pts_3d_eigen[i].y() << " , " << my_pts_3d_eigen[i].z()
     // << std::endl;
@@ -222,6 +249,26 @@ int main(int argc, char **argv) {
   cout << "solve pnp by ceres auto diff cost time: " << time_used.count() << " seconds." << endl;
 
 
+  cout << "calling pose only bundle adjustment by ceres auto diff" << endl;
+  Sophus::SE3d Tbw_pose_only_ceres_auto_diff;
+  t1 = chrono::steady_clock::now();
+  bundleAdjustmentBasePoseOnlyCeresAutoDiff(my_pts_3d_eigen_in_base_coordinate, my_pts_2d_eigen , K_eigen, Tbw_pose_only_ceres_auto_diff, Tcb);
+  t2 = chrono::steady_clock::now();
+  time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+  cout << "solve pnp by ceres auto diff cost time: " << time_used.count() << " seconds." << endl;
+
+  std::cout << "only base pose estimation with auto diff by transformation: \n" << (Tbc * pose_only_ceres_auto_diff * Tcb).matrix() << std::endl;
+
+  cout << "calling pose only bundle adjustment by ceres pose only" << endl;
+  Sophus::SE3d Tbw_pose_only_ceres;
+  t1 = chrono::steady_clock::now();
+  bundleAdjustmentBasePoseOnlyCeres(my_pts_3d_eigen_in_base_coordinate, my_pts_2d_eigen , K_eigen, Tbw_pose_only_ceres, Tcb);
+  t2 = chrono::steady_clock::now();
+  time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+  cout << "solve pnp by ceres cost time: " << time_used.count() << " seconds." << endl;
+
+
+
   cout << "calling bundle adjustment by ceres auto diff" << endl;
   Sophus::SE3d pose_ceres_auto_diff(pose_only_ceres_auto_diff);
   t1 = chrono::steady_clock::now();
@@ -229,7 +276,6 @@ int main(int argc, char **argv) {
   t2 = chrono::steady_clock::now();
   time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve pnp by ceres auto diff cost time: " << time_used.count() << " seconds." << endl;
-
 
 
   std::cout << "only pose estimation: \n" << pose_only_ceres.matrix() << std::endl;
@@ -599,6 +645,131 @@ private:
 
 };
 
+
+class reprojectionCostFunctionForBasePoseOnly : public ceres::SizedCostFunction<
+2, /* number of residuals, which 2D observations */
+6  /* number of parameters for first parameter block, which is 6D pose parameters */
+> {
+
+
+public:
+
+  reprojectionCostFunctionForBasePoseOnly(const Eigen::Vector3d &p_w, const Eigen::Vector2d &obs, const Eigen::Matrix<double, 3, 3> &K, const Sophus::SE3d &Tcb) : obs_(obs), K_(K), p_w_(p_w), Tcb_(Tcb){}
+
+  virtual bool Evaluate(double const * const * parameters,
+                        double* residuals,
+                        double** jacobians) const {
+      // se3 for pose
+      // Eigen::Matrix<double, 6, 1> se3_pose;
+      // se3_pose << parameters[0][0], parameters[0][1], parameters[0][2], parameters[0][3], parameters[0][4], parameters[0][5];
+
+      Eigen::Map<const Eigen::Matrix<double, 1, 6, Eigen::RowMajor>> se3_pose(parameters[0]);
+      // Eigen::Matrix<double, 1, 6> se3_pose(parameters[0][0], parameters[0][1], parameters[0][2], parameters[0][3], parameters[0][4], parameters[0][5]);
+      // se3_pose << parameters[0][0], parameters[0][1], parameters[0][2], parameters[0][3], parameters[0][4], parameters[0][5];
+
+      Sophus::SE3d Tbw = Sophus::SE3d::exp(se3_pose);
+
+      const Eigen::Vector3d p_b = Tbw * p_w_;
+      const Eigen::Vector3d p_c = Tcb_ * p_b;
+      const Eigen::Matrix3d Rcb = Tcb_.rotationMatrix();
+
+      Eigen::Vector3d reproject_pixel = K_* p_c;
+
+
+      const double inv_Zc = 1.0 / ( p_c(2) + 1e-18 );
+      const double inv_Zc2 = inv_Zc * inv_Zc;
+      // const double Xc = p_c(0);
+      // const double Yc = p_c(1);
+      // const double Zc = p_c(2);
+
+      const double fx = K_(0, 0);
+      const double fy = K_(1, 1);
+
+      // const double a = Tcb(0,0);
+      // const double b = Tcb(0,1);
+      // const double c = Tcb(0,2);
+      // const double d = Tcb(1,0);
+      // const double e = Tcb(1,1);
+      // const double f = Tcb(1,2);
+      // const double g = Tcb(2,0);
+      // const double h = Tcb(2,1);
+      // const double i = Tcb(2,2);
+
+
+      reproject_pixel = reproject_pixel * inv_Zc;
+
+      // Eigen::Map<Eigen::Vector2d> reproject_res(residuals);
+      // u - reproject_u
+      // v - reproject_v
+      // reproject_res = obs_ - reproject_pixel.head<2>(); 
+      residuals[0] = obs_[0] - reproject_pixel[0];
+      residuals[1] = obs_[1] - reproject_pixel[1];
+
+
+      if(jacobians){
+
+                
+        // jacobian_Pc_by_Pose <<  -a, -b, -c, b* p_b(2) - c * p_b(1), -a*p_b(2) + c * p_b(0),a * p_b(1) - b * p_b(0),
+        //                         -d, -e, -f, e * p_b(2) - f * p_b(1), -d * p_b(2) + f * p_b(0), d * p_b(1) - e * p_b(0),
+        //                         -g, -h, -i, h * p_b(2) - i * p_b(1), -g * p_b(2) + i * p_b(0), g * p_b(1) - h * p_b(0);
+        if(jacobians[0]){
+
+          Eigen::Matrix<double, 2, 3> jacobian_res_by_Pc;
+          jacobian_res_by_Pc << -fx * inv_Zc, 0, fx * p_c(0) * inv_Zc2,
+                                0, -fy * inv_Zc,  fy * p_c(1) * inv_Zc2;
+          Eigen::Matrix<double, 3, 3> negative_skew_symmetric_vector_for_p_b;
+          negative_skew_symmetric_vector_for_p_b <<  0, p_b(2), -p_b(1),
+                                                     -p_b(2), 0, p_b(0),
+                                                     p_b(1), -p_b(0), 0;
+          Eigen::Matrix<double, 3, 6> jacobian_Pc_by_Pose;  
+          jacobian_Pc_by_Pose.leftCols<3>() = Rcb;
+          jacobian_Pc_by_Pose.rightCols<3>() = Rcb * negative_skew_symmetric_vector_for_p_b;
+
+          Eigen::Map<Eigen::Matrix<double, 2, 6, Eigen::RowMajor>> jacobian_res_by_pose(jacobians[0]);
+          jacobian_res_by_pose = jacobian_res_by_Pc * jacobian_Pc_by_Pose;
+
+          // std::cout << "just check" << std::endl;
+
+        }
+
+      }
+
+      // if(jacobians){
+
+      //   const double J00 = -fx * inv_Zc;
+      //   const double J02 = fx * Xc * inv_Zc2;
+      //   const double J03 = fx * Xc * Yc * inv_Zc2;
+      //   const double J04 = -fx - fx * Xc * Xc * inv_Zc2;
+      //   const double J05 = fx * Yc * inv_Zc;
+
+      //   const double J11 = -fy * inv_Zc;
+      //   const double J12 = fy * Yc * inv_Zc2;
+      //   const double J13 = fy + fy * Yc * Yc * inv_Zc2;
+      //   const double J14 = -fy * Xc * Yc * inv_Zc2;
+      //   const double J15 = -fy * Xc * inv_Zc;
+
+      //   if(jacobians[0]){
+      //     Eigen::Map<Eigen::Matrix<double, 2, 6, Eigen::RowMajor>> jacobian_res_by_pose(jacobians[0]);
+      //     jacobian_res_by_pose << J00, 0  , J02, J03, J04, J05,
+      //                             0  , J11, J12, J13, J14, J15;
+      //   }
+
+      // }
+
+
+
+      return true;
+
+  }
+
+private:
+  const Eigen::Vector3d p_w_;
+  const Eigen::Vector2d obs_;
+  const Eigen::Matrix<double, 3, 3> K_;
+  const Sophus::SE3d Tcb_;
+
+};
+
 struct reprojectionAutoDiffCostFunctor {
 
 
@@ -689,6 +860,71 @@ private:
   const Eigen::Vector3d p_w_;
   const Eigen::Vector2d obs_;
   const Eigen::Matrix<double, 3, 3> K_;
+
+};
+
+
+struct reprojectionAutoDiffCostFunctorForBasePoseOnly {
+
+
+  reprojectionAutoDiffCostFunctorForBasePoseOnly(const Eigen::Vector3d &p_w, const Eigen::Vector2d &obs, const Eigen::Matrix<double, 3, 3> &K, const double* Tcb_pose_array) : obs_(obs), K_(K), p_w_(p_w), Tcb_pose_array_(Tcb_pose_array){}
+
+  template <typename T>
+  bool operator()(const T* const camera,
+                  T* residuals) const {
+
+      T p_b[3];
+      T p_c[3];
+      T p_w[3];
+      T Tcb[6];
+
+      Tcb[0] = T(Tcb_pose_array_[0]);
+      Tcb[1] = T(Tcb_pose_array_[1]);
+      Tcb[2] = T(Tcb_pose_array_[2]);
+      Tcb[3] = T(Tcb_pose_array_[3]);
+      Tcb[4] = T(Tcb_pose_array_[4]);
+      Tcb[5] = T(Tcb_pose_array_[5]);
+
+      p_w[0] = T(p_w_[0]);
+      p_w[1] = T(p_w_[1]);
+      p_w[2] = T(p_w_[2]);
+
+      ceres::AngleAxisRotatePoint(camera, p_w, p_b);
+      p_b[0] += camera[3];
+      p_b[1] += camera[4];
+      p_b[2] += camera[5];
+
+      ceres::AngleAxisRotatePoint(Tcb, p_b, p_c);
+      p_c[0] += Tcb[3];
+      p_c[1] += Tcb[4];
+      p_c[2] += Tcb[5];
+
+      T fx = T(K_(0,0));
+      T fy = T(K_(1,1));
+      T cx = T(K_(0,2));
+      T cy = T(K_(1,2));
+
+      T x = p_c[0] / p_c[2];
+      T y = p_c[1] / p_c[2];
+
+      T reproject_u = fx * x + cx;
+      T reproject_v = fy * y + cy;
+
+
+      residuals[0] = T(obs_[0]) - reproject_u;
+      residuals[1] = T(obs_[1]) - reproject_v;
+
+
+
+      return true;
+
+  }
+
+private:
+  const Eigen::Vector3d p_w_;
+  const Eigen::Vector2d obs_;
+  const Eigen::Matrix<double, 3, 3> K_;
+  const double *Tcb_pose_array_;
 
 };
 
@@ -801,20 +1037,23 @@ void bundleAdjustmentCeresAutoDiff(
   pose = Sophus::SE3d(rotation_matrix, translation);
 
 
-  for(int i=0;i<points_3d_copy.size();i++){
+  // for(int i=0;i<points_3d_copy.size();i++){
 
 
-    std::cout << "3d point before:" << points_3d_copy[i].x() << " , " <<  points_3d_copy[i].y() << " , " << points_3d_copy[i].z() << "| "
-    << "after:" << points_3d[i].x() << " , " <<  points_3d[i].y() << " , " << points_3d[i].z()
-    << std::endl;
+  //   std::cout << "3d point before:" << points_3d_copy[i].x() << " , " <<  points_3d_copy[i].y() << " , " << points_3d_copy[i].z() << "| "
+  //   << "after:" << points_3d[i].x() << " , " <<  points_3d[i].y() << " , " << points_3d[i].z()
+  //   << std::endl;
 
-  }
+  // }
 
 
   std::cout << "BA estimation with auto diff: \n" << pose.matrix() << std::endl;
 
 
 }
+
+
+
 
 void bundleAdjustmentPoseOnlyCeres(
   std::vector<Eigen::Vector3d> &points_3d,
@@ -848,6 +1087,44 @@ void bundleAdjustmentPoseOnlyCeres(
 
   pose = Sophus::SE3d::exp(se3_vec);
   std::cout << "only pose estimation: \n" << pose.matrix() << std::endl;
+
+
+}
+
+
+void bundleAdjustmentBasePoseOnlyCeres(
+  std::vector<Eigen::Vector3d> &points_3d,
+  std::vector<Eigen::Vector2d> &points_2d,
+  const Eigen::Matrix<double, 3, 3> &K,
+  Sophus::SE3d &Tbw,
+  Sophus::SE3d &Tcb
+) {
+  
+  Eigen::Matrix<double, 1, 6> se3_vec = Tbw.log().transpose();
+
+  ceres::Problem problem;
+  
+  for(int idx=0;idx<points_2d.size();idx++){
+
+
+    ceres::CostFunction *cost_function = new reprojectionCostFunctionForBasePoseOnly(points_3d[idx], points_2d[idx], K, Tcb);
+    problem.AddResidualBlock(cost_function, nullptr, se3_vec.data());
+  }
+  
+  
+
+  // Run the solver!
+  ceres::Solver::Options options;
+  options.linear_solver_type = ceres::LinearSolverType::SPARSE_SCHUR;
+  options.minimizer_progress_to_stdout = true;
+  // options.gradient_tolerance = 1e-10;
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+  std::cout << summary.FullReport() << "\n";
+
+
+  Tbw = Sophus::SE3d::exp(se3_vec);
+  std::cout << "only base pose estimation: \n" << Tbw.matrix() << std::endl;
 
 
 }
@@ -905,6 +1182,75 @@ void bundleAdjustmentPoseOnlyCeresAutoDiff(
   pose = Sophus::SE3d(rotation_matrix, translation);
 
   std::cout << "only pose estimation with auto diff: \n" << pose.matrix() << std::endl;
+
+
+}
+
+
+void bundleAdjustmentBasePoseOnlyCeresAutoDiff(
+  std::vector<Eigen::Vector3d> &points_3d,
+  std::vector<Eigen::Vector2d> &points_2d,
+  const Eigen::Matrix<double, 3, 3> &K,
+  Sophus::SE3d &Tbw,
+  Sophus::SE3d &Tcb
+) {
+  
+  Eigen::Matrix3d Tbw_rotation_matrix = Tbw.rotationMatrix();
+  Eigen::Vector3d Tbw_translation = Tbw.translation();
+  Eigen::AngleAxisd Tbw_angle_axis(Tbw_rotation_matrix);
+  Eigen::Vector3d Tbw_rotation_vec = Tbw_angle_axis.angle() * Tbw_angle_axis.axis();
+
+  Eigen::Matrix3d Tcb_rotation_matrix = Tcb.rotationMatrix();
+  Eigen::Vector3d Tcb_translation = Tcb.translation();
+  Eigen::AngleAxisd Tcb_angle_axis(Tcb_rotation_matrix);
+  Eigen::Vector3d Tcb_rotation_vec = Tcb_angle_axis.angle() * Tcb_angle_axis.axis();
+
+  double Tbw_array[6];
+  for (int i = 0; i < 3; ++i) {
+      Tbw_array[i] = Tbw_rotation_vec[i];
+      Tbw_array[i + 3] = Tbw_translation[i];
+  }
+
+  double Tcb_array[6];
+  for (int i = 0; i < 3; ++i) {
+      Tcb_array[i] = Tcb_rotation_vec[i];
+      Tcb_array[i + 3] = Tcb_translation[i];
+  }
+
+  // Eigen::Matrix<double, 1, 6> se3_vec = pose.log().transpose();
+
+  ceres::Problem problem;
+  
+  for(int idx=0;idx<points_2d.size();idx++){
+
+
+    ceres::CostFunction *cost_function = new ceres::AutoDiffCostFunction<reprojectionAutoDiffCostFunctorForBasePoseOnly, 2, 6>(
+      new reprojectionAutoDiffCostFunctorForBasePoseOnly(points_3d[idx], points_2d[idx], K, Tcb_array)
+    );
+    problem.AddResidualBlock(cost_function, nullptr, Tbw_array);
+  }
+
+  // Run the solver!
+  ceres::Solver::Options options;
+  options.linear_solver_type = ceres::LinearSolverType::SPARSE_SCHUR;
+  options.minimizer_progress_to_stdout = true;
+  // options.gradient_tolerance = 1e-10;
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+  std::cout << summary.FullReport() << "\n";
+
+
+  Tbw_rotation_vec = Eigen::Vector3d(Tbw_array[0], Tbw_array[1], Tbw_array[2]);
+  Tbw_translation = Eigen::Vector3d(Tbw_array[3], Tbw_array[4], Tbw_array[5]);
+
+  Eigen::Vector3d axis = Tbw_rotation_vec.normalized();
+  double angle = Tbw_rotation_vec.norm();
+  Tbw_angle_axis = Eigen::AngleAxisd(angle, axis);
+  Tbw_rotation_matrix = Tbw_angle_axis.toRotationMatrix();
+
+  Tbw = Sophus::SE3d(Tbw_rotation_matrix, Tbw_translation);
+
+  std::cout << "only base pose estimation with auto diff: \n" << Tbw.matrix() << std::endl;
 
 
 }

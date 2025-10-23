@@ -5,6 +5,36 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "ch5_imageBasicsUndistort",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/ch5/build/imageBasics/undistortImageWithOptimalCrop",
+            // "args": ["/root/datasets2/PolyTunnel_haygrove_June2025/EASY/right_basler/1751277576747196262.png"],
+            // "args": ["/root/datasets2/BotanicGarden/1018-00/1018_00_img10hz600p/left_rgb/1666059838350278378.png"],
+            "args": ["/root/slambook2/ch5/imageBasics/distorted.png"],
+
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+        },
+        {
+            "name": "ch12_dense_mono_mapping",
+            "type": "cppdbg",
+            "request": "launch",
+            // "program": "${workspaceFolder}/ch12/build/dense_mono/dense_mapping_for_botanic_garden",
+            // "args": ["/root/datasets2/colmap_datasets/BotanicGarden_1018_00_64/"],
+            "program": "${workspaceFolder}/ch12/build/dense_mono/dense_mapping",
+            "args": ["/root/datasets2/remode_test_data/test_data/"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb"
+            
+        },
+        {
             "name": "ch7_pose_estimation_3d2d",
             "type": "cppdbg",
             "request": "launch",
@@ -24,8 +54,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/ch13/bin/run_kitti_stereo",
             "args": [
-                // "${workspaceFolder}/ch13/config/default.yaml"
-                "${workspaceFolder}/ch13/config/botanic_garden_default.yaml"
+                "${workspaceFolder}/ch13/config/default.yaml"
+                // "${workspaceFolder}/ch13/config/botanic_garden_default.yaml"
 
             ],
             "stopAtEntry": false,

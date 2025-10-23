@@ -51,8 +51,8 @@ bool Frontend::Track() {
     }
 
     int num_track_last = TrackLastFrame();
-    tracking_inliers_ = EstimateCurrentPoseWithCeres();
-    // tracking_inliers_ = EstimateCurrentPose();
+    // tracking_inliers_ = EstimateCurrentPoseWithCeres();
+    tracking_inliers_ = EstimateCurrentPose();
 
 
     if (tracking_inliers_ > num_features_tracking_) {
@@ -93,7 +93,7 @@ bool Frontend::InsertKeyframe() {
     // triangulate map points
     TriangulateNewPoints();
     // update backend because we have a new keyframe
-    // backend_->UpdateMap();
+    backend_->UpdateMap();
 
     if (viewer_) viewer_->UpdateMap();
 
@@ -179,7 +179,7 @@ bool Frontend::BuildInitMap() {
     }
     current_frame_->SetKeyFrame();
     map_->InsertKeyFrame(current_frame_);
-    // backend_->UpdateMap();
+    backend_->UpdateMap();
 
     LOG(INFO) << "Initial map created with " << cnt_init_landmarks
               << " map points";
@@ -378,24 +378,24 @@ int Frontend::EstimateCurrentPose() {
         cnt_outlier = 0;
 
         // count the outliers
-        // for (size_t i = 0; i < edges.size(); ++i) {
-        //     auto e = edges[i];
-        //     if (features[i]->is_outlier_) {
-        //         e->computeError();
-        //     }
-        //     if (e->chi2() > chi2_th) {
-        //         features[i]->is_outlier_ = true;
-        //         e->setLevel(1);
-        //         cnt_outlier++;
-        //     } else {
-        //         features[i]->is_outlier_ = false;
-        //         e->setLevel(0);
-        //     };
+        for (size_t i = 0; i < edges.size(); ++i) {
+            auto e = edges[i];
+            if (features[i]->is_outlier_) {
+                e->computeError();
+            }
+            if (e->chi2() > chi2_th) {
+                features[i]->is_outlier_ = true;
+                e->setLevel(1);
+                cnt_outlier++;
+            } else {
+                features[i]->is_outlier_ = false;
+                e->setLevel(0);
+            };
 
-        //     if (iteration == 2) {
-        //         e->setRobustKernel(nullptr);
-        //     }
-        // }
+            if (iteration == 2) {
+                e->setRobustKernel(nullptr);
+            }
+        }
     }
 
     LOG(INFO) << "Outlier/Inlier in pose estimating: " << cnt_outlier << "/"

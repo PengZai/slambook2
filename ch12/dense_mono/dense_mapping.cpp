@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -42,6 +43,7 @@ const int ncc_window_size = 3;    // NCC 取的窗口半宽度
 const int ncc_area = (2 * ncc_window_size + 1) * (2 * ncc_window_size + 1); // NCC窗口面积
 const double min_cov = 0.1;     // 收敛判定：最小方差
 const double max_cov = 10;      // 发散判定：最大方差
+double min_depth, max_depth;
 
 // ------------------------------------------------------------------
 // 重要的函数
@@ -161,6 +163,49 @@ inline bool inside(const Vector2d &pt) {
            && pt(0, 0) + boarder < width && pt(1, 0) + boarder <= height;
 }
 
+
+// Save depth image as point cloud in PLY format
+void saveDepthToPLY(const cv::Mat& depth, float fx, float fy, float cx, float cy,
+                    const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open " << filename << std::endl;
+        return;
+    }
+
+    std::vector<cv::Point3f> points;
+    for (int v = 0; v < depth.rows; v++) {
+        for (int u = 0; u < depth.cols; u++) {
+            float z = depth.at<float>(v, u);   // depth in meters
+            if (z <= 0 || std::isnan(z) || z > max_depth * 10) continue;
+
+            float x = (u - cx) * z / fx;
+            float y = (v - cy) * z / fy;
+            points.emplace_back(x, y, z);
+            // if(points.size() == 6423)
+            // {
+            //     std::cout << "stop";
+            // }
+        }
+    }
+
+    // Write PLY header
+    file << "ply\nformat ascii 1.0\n";
+    file << "element vertex " << points.size() << "\n";
+    file << "property float x\nproperty float y\nproperty float z\n";
+    file << "end_header\n";
+
+    // Write points
+    for (auto &p : points) {
+        file << p.x << " " << p.y << " " << p.z << "\n";
+    }
+    file.close();
+
+    std::cout << "Saved " << points.size() << " points to " << filename << std::endl;
+}
+
+
+
 // 显示极线匹配
 void showEpipolarMatch(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_curr);
 
@@ -183,12 +228,16 @@ int main(int argc, char **argv) {
     vector<string> color_image_files;
     vector<SE3d> poses_TWC;
     Mat ref_depth;
+
     bool ret = readDatasetFiles(argv[1], color_image_files, poses_TWC, ref_depth);
     if (ret == false) {
         cout << "Reading image files failed!" << endl;
         return -1;
     }
     cout << "read total " << color_image_files.size() << " files." << endl;
+
+    cv::minMaxLoc(ref_depth, &min_depth, &max_depth);
+
 
     // 第一张图
     Mat ref = imread(color_image_files[0], 0);                // gray-scale image
@@ -204,15 +253,29 @@ int main(int argc, char **argv) {
         if (curr.data == nullptr) continue;
         SE3d pose_curr_TWC = poses_TWC[index];
         SE3d pose_T_C_R = pose_curr_TWC.inverse() * pose_ref_TWC;   // 坐标转换关系： T_C_W * T_W_R = T_C_R
+
+        auto t0 = std::chrono::steady_clock::now();
         update(ref, curr, pose_T_C_R, depth, depth_cov2);
+        auto t1 = std::chrono::steady_clock::now();
+        std::chrono::duration<double, std::milli> ms = t1 - t0;
+        std::cout << "depth update for one image took " << ms.count() << " ms\n";
+
         evaludateDepth(ref_depth, depth);
         plotDepth(ref_depth, depth);
         imshow("image", curr);
         waitKey(1);
+
     }
 
+    // cv::min(depth, max_depth, depth);
+    // cv::max(depth, min_depth, depth);
     cout << "estimation returns, saving depth map ..." << endl;
-    imwrite("depth.png", depth);
+    cv::imwrite("depth.png", depth*0.4);
+    imshow("depth.png", depth*0.4);
+
+    saveDepthToPLY(depth, fx, fy, cx, cy, "depth.ply");
+
+    waitKey(0);
     cout << "done." << endl;
 
     return 0;
@@ -309,13 +372,14 @@ bool epipolarSearch(
     epipolar_direction = epipolar_line;        // 极线方向
     epipolar_direction.normalize();
     double half_length = 0.5 * epipolar_line.norm();    // 极线线段的半长度
-    if (half_length > 100) half_length = 100;   // 我们不希望搜索太多东西
+    if (half_length > 200) half_length = 200;   // 我们不希望搜索太多东西
 
     // 取消此句注释以显示极线（线段）
     // showEpipolarLine( ref, curr, pt_ref, px_min_curr, px_max_curr );
 
     // 在极线上搜索，以深度均值点为中心，左右各取半长度
     double best_ncc = -1.0;
+    double smallest_ncc = 1e20;
     Vector2d best_px_curr;
     for (double l = -half_length; l <= half_length; l += 0.7) { // l+=sqrt(2)
         Vector2d px_curr = px_mean_curr + l * epipolar_direction;  // 待匹配点
@@ -326,6 +390,9 @@ bool epipolarSearch(
         if (ncc > best_ncc) {
             best_ncc = ncc;
             best_px_curr = px_curr;
+        }
+        if(ncc < smallest_ncc){
+            smallest_ncc = ncc;
         }
     }
     if (best_ncc < 0.85f)      // 只相信 NCC 很高的匹配
@@ -457,8 +524,8 @@ void evaludateDepth(const Mat &depth_truth, const Mat &depth_estimate) {
 
 void showEpipolarMatch(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_curr) {
     Mat ref_show, curr_show;
-    cv::cvtColor(ref, ref_show, CV_GRAY2BGR);
-    cv::cvtColor(curr, curr_show, CV_GRAY2BGR);
+    cv::cvtColor(ref, ref_show, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(curr, curr_show, cv::COLOR_GRAY2BGR);
 
     cv::circle(ref_show, cv::Point2f(px_ref(0, 0), px_ref(1, 0)), 5, cv::Scalar(0, 0, 250), 2);
     cv::circle(curr_show, cv::Point2f(px_curr(0, 0), px_curr(1, 0)), 5, cv::Scalar(0, 0, 250), 2);
@@ -472,8 +539,8 @@ void showEpipolarLine(const Mat &ref, const Mat &curr, const Vector2d &px_ref, c
                       const Vector2d &px_max_curr) {
 
     Mat ref_show, curr_show;
-    cv::cvtColor(ref, ref_show, CV_GRAY2BGR);
-    cv::cvtColor(curr, curr_show, CV_GRAY2BGR);
+    cv::cvtColor(ref, ref_show, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(curr, curr_show, cv::COLOR_GRAY2BGR);
 
     cv::circle(ref_show, cv::Point2f(px_ref(0, 0), px_ref(1, 0)), 5, cv::Scalar(0, 255, 0), 2);
     cv::circle(curr_show, cv::Point2f(px_min_curr(0, 0), px_min_curr(1, 0)), 5, cv::Scalar(0, 255, 0), 2);

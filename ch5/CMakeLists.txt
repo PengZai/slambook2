@@ -1,8 +1,19 @@
 cmake_minimum_required(VERSION 2.8)
 
-set(CMAKE_BUILD_TYPE "Release")
-# 添加c++ 11标准支持
-set(CMAKE_CXX_FLAGS "-std=c++11 -O2")
+
+option(ENABLE_CMAKE_DEBUG "Enable detailed debug messages" ON)
+
+if(ENABLE_CMAKE_DEBUG)
+    set(CMAKE_BUILD_TYPE "Debug")
+    # 添加c++ 11标准支持
+else()
+    set(CMAKE_BUILD_TYPE "Release")
+
+endif()
+
+
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O2")
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++11 -g3 -g")
 
 # Eigen
 include_directories("/usr/include/eigen3")

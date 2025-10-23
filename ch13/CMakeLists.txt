@@ -26,10 +26,10 @@ set( CMAKE_CXX_FLAGS "-std=c++11" )
 set(CMAKE_BUILD_TYPE "Debug")
 
 # Enable compile optimizations
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 # Enable debug flags (use if you want to debug in gdb)
-set(CMAKE_CXX_FLAGS_DEBUG "-g3 -Wall -Wuninitialized -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_DEBUG "-g3")
 
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)

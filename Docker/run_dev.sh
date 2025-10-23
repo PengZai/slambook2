@@ -3,7 +3,7 @@
 PROJECT_NAME="slambook2"
 IMAGE_NAME="${PROJECT_NAME}:ubuntu18.04"
 DATA_PATH="/media/${USER}/zhipeng_usb/datasets"
-DATA_PATH2="/media/${USER}/zhipeng_8t/datasets"
+DATA_PATH2="/media/${USER}/zhipeng_8t1/datasets"
 # Pick up config image key if specified
 if [[ ! -z "${CONFIG_DATA_PATH}" ]]; then
     DATA_PATH=$CONFIG_DATA_PATH

@@ -2,13 +2,15 @@ cmake_minimum_required(VERSION 2.8)
 project(dense_monocular)
 
 set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -O3")
+add_definitions("-DENABLE_SSE")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O3 -march=native")
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++11 -g3 -march=native")
 
 ############### dependencies ######################
 # Eigen
 include_directories("/usr/include/eigen3")
 # OpenCV
-find_package(OpenCV 3.1 REQUIRED)
+find_package(OpenCV 4.2 REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 # Sophus
 find_package(Sophus REQUIRED)
@@ -19,4 +21,7 @@ set(THIRD_PARTY_LIBS
         ${Sophus_LIBRARIES})
 
 add_executable(dense_mapping dense_mapping.cpp)
+add_executable(dense_mapping_for_botanic_garden dense_mapping_for_botanic_garden.cpp)
+
 target_link_libraries(dense_mapping ${THIRD_PARTY_LIBS})
+target_link_libraries(dense_mapping_for_botanic_garden ${THIRD_PARTY_LIBS})
